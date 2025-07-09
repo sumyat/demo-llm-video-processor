@@ -1,54 +1,43 @@
-"""LangGraph single-node graph template.
-
-Returns a predefined response. Replace logic and configuration as needed.
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, TypedDict
-
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, END
+from langchain_yt_dlp.youtube_loader import YoutubeLoaderDL
 
 
-class Configuration(TypedDict):
-    """Configurable parameters for the agent.
-
-    Set these when creating assistants OR when invoking the graph.
-    See: https://langchain-ai.github.io/langgraph/cloud/how-tos/configuration_cloud/
-    """
-
-    my_configurable_param: str
-
-
-@dataclass
 class State:
-    """Input state for the agent.
-
-    Defines the initial structure of incoming data.
-    See: https://langchain-ai.github.io/langgraph/concepts/low_level/#state
-    """
-
-    changeme: str = "example"
+    video_details: str = "example"
 
 
-async def call_model(state: State, config: RunnableConfig) -> Dict[str, Any]:
-    """Process input and returns output.
-
-    Can use runtime configuration to alter behavior.
-    """
-    configuration = config["configurable"]
-    return {
-        "changeme": "output from call_model. "
-        f'Configured with {configuration.get("my_configurable_param")}'
-    }
+async def download_video_node(state: State):
+    loader = YoutubeLoaderDL.from_youtube_url(
+        "https://www.youtube.com/watch?v=SvMabklWzDY", add_video_info=True
+    )
+    documents = loader.load()
+    state.video_details = documents[0].metadata
 
 
-# Define the graph
-graph = (
-    StateGraph(State, config_schema=Configuration)
-    .add_node(call_model)
-    .add_edge("__start__", "call_model")
-    .compile(name="New Graph")
-)
+
+async def generator_tags_node(state: State):
+    state.video_details = "generate tags"
+
+async def embed_node(state: State):
+    state.video_details = "embed video"
+
+async def store_node(state: State):
+    state.video_details = "store video"
+
+
+graph = StateGraph(State)
+
+graph.add_node("video_downloader", download_video_node)
+graph.add_node("tag_generator", generator_tags_node)
+graph.add_node("embedding", embed_node)
+graph.add_node("storing", store_node)
+
+graph.set_entry_point("video_downloader")
+graph.add_edge("video_downloader", "tag_generator")
+graph.add_edge("tag_generator", "embedding")
+graph.add_edge("embedding", "storing")
+graph.add_edge("storing", END)
+
+final_graph = graph.compile(name="Video Processor Graph")
