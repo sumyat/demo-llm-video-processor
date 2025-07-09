@@ -5,3 +5,7 @@ langgraph
 langchain-community
 pytest
 langchain-ollama
+anyio
+psycopg2
+psycopg2-binary
+pgvector
