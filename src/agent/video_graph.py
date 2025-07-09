@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from langgraph.graph import StateGraph, END
 from langchain_yt_dlp.youtube_loader import YoutubeLoaderDL
+from langchain_ollama import OllamaEmbeddings
+
+
+embedding_model = OllamaEmbeddings(model="nomic-embed-text")
 
 
 class State:
-    video_details: str = "example"
+    video_details: str = ""
+    embedding: list = None
 
 
 async def download_video_node(state: State):
@@ -14,17 +19,20 @@ async def download_video_node(state: State):
     )
     documents = loader.load()
     state.video_details = documents[0].metadata
-
+    return state
 
 
 async def generator_tags_node(state: State):
     state.video_details = "generate tags"
+    return state
 
 async def embed_node(state: State):
-    state.video_details = "embed video"
+    state.embedding = embedding_model.embed_query(state.video_details)
+    return state
 
 async def store_node(state: State):
     state.video_details = "store video"
+    return state
 
 
 graph = StateGraph(State)
